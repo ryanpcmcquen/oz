@@ -3,11 +3,14 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
 /*** Defines: ***/
+#define OZ_VERSION "0.0.1"
+
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 /*** Data: ***/
@@ -19,33 +22,39 @@ struct editorConfig {
 
 struct editorConfig E;
 
-/*** Output: ***/
-void editorDrawRows() {
-    int y;
-    for (y = 0; y < E.screenrows; y++) {
-        write(STDOUT_FILENO, "~", 1);
+/*** Append buffer: ***/
+struct abuf {
+    char *b;
+    int len;
+};
 
-        if (y < E.screenrows - 1) {
-            write(STDOUT_FILENO, "\r\n", 2);
-        }
+#define ABUF_INIT {NULL, 0}
 
+void abAppend(struct abuf *ab, const char *s, int len) {
+    char *new = realloc(ab->b, ab->len + len);
+
+    if (new == NULL) {
+        return;
     }
+    memcpy(&new[ab->len], s, len);
+    ab->b = new;
+    ab->len += len;
 }
-void clearScreen() {
-    write(STDOUT_FILENO, "\x1b[2j", 4);
-    write(STDOUT_FILENO, "\x1b[H", 3);
+
+void abFree(struct abuf *ab) {
+    free(ab->b);
 }
-void editorRefreshScreen() {
-    clearScreen();
 
-    editorDrawRows();
-
-    write(STDOUT_FILENO, "\x1b[H", 3);
+/*** Refactors: ***/
+void clearScreen(struct abuf *ab) {
+    abAppend(ab, "\x1b[2J", 4);
+    abAppend(ab, "\x1b[H", 3);
 }
 
 /*** Terminal: ***/
 void die(const char *s) {
-    clearScreen();
+    struct abuf ab = ABUF_INIT;
+    clearScreen(&ab);
 
     perror(s);
     exit(1);
@@ -133,14 +142,56 @@ int getWindowSize(int *rows, int *cols) {
     }
 }
 
+/*** Output: ***/
+void editorDrawRows(struct abuf *ab) {
+    int y;
+    for (y = 0; y < E.screenrows; y++) {
+        if (y == E.screenrows / 3) {
+            char welcome[80];
+            int welcomelen = snprintf(
+                welcome,
+                sizeof(welcome),
+                "OZ editor -- version %s",
+                OZ_VERSION
+            );
+            if (welcomelen > E.screencols) {
+                welcomelen = E.screencols;
+                abAppend(ab, welcome, welcomelen);
+            } else {
+                abAppend(ab, "~", 1);
+            }
+        }
+
+        abAppend(ab, "\x1b[K", 3);
+        if (y < E.screenrows - 1) {
+            abAppend(ab, "\r\n", 2);
+        }
+
+    }
+}
+void editorRefreshScreen() {
+    struct abuf ab = ABUF_INIT;
+
+    abAppend(&ab, "\x1b[?25l", 6);
+    abAppend(&ab, "\x1b[H", 3);
+
+    editorDrawRows(&ab);
+
+    abAppend(&ab, "\x1b[H", 3);
+    abAppend(&ab, "\x1b[?25h", 6);
+
+    write(STDOUT_FILENO, ab.b, ab.len);
+    abFree(&ab);
+}
 
 /*** Input: ***/
 void editorProcessKeypress() {
     char c = editorReadKey();
+    struct abuf ab = ABUF_INIT;
 
     switch (c) {
     case CTRL_KEY('q'):
-        clearScreen();
+        clearScreen(&ab);
         exit(0);
         break;
     }
