@@ -23,39 +23,10 @@ struct editorConfig {
 
 struct editorConfig E;
 
-/*** Append buffer: ***/
-struct abuf {
-    char *b;
-    int len;
-};
-
-#define ABUF_INIT {NULL, 0}
-
-void abAppend(struct abuf *ab, const char *s, int len) {
-    char *new = realloc(ab->b, ab->len + len);
-
-    if (new == NULL) {
-        return;
-    }
-    memcpy(&new[ab->len], s, len);
-    ab->b = new;
-    ab->len += len;
-}
-
-void abFree(struct abuf *ab) {
-    free(ab->b);
-}
-
-/*** Refactors: ***/
-void clearScreen(struct abuf *ab) {
-    abAppend(ab, "\x1b[2J", 4);
-    abAppend(ab, "\x1b[H", 3);
-}
-
 /*** Terminal: ***/
 void die(const char *s) {
-    struct abuf ab = ABUF_INIT;
-    clearScreen(&ab);
+    write(STDOUT_FILENO, "\x1b[2J", 4);
+    write(STDOUT_FILENO, "\x1b[H", 3);
 
     perror(s);
     exit(1);
@@ -74,7 +45,6 @@ void enableRawMode() {
     atexit(disableRawMode);
 
     struct termios raw = E.orig_termios;
-    tcgetattr(STDIN_FILENO, &raw);
 
     raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
     raw.c_oflag &= ~(OPOST);
@@ -121,7 +91,7 @@ int getCursorPosition(int *rows, int *cols) {
     if (buf[0] != '\x1b' || buf[1] != '[') {
         return -1;
     }
-    if (sscanf(&buf[2], "%d;%d", rows, cols) != 1) {
+    if (sscanf(&buf[2], "%d;%d", rows, cols) != 2) {
         return -1;
     }
 
@@ -143,18 +113,42 @@ int getWindowSize(int *rows, int *cols) {
     }
 }
 
+/*** Append buffer: ***/
+struct abuf {
+    char *b;
+    int len;
+};
+
+#define ABUF_INIT {NULL, 0}
+
+void abAppend(struct abuf *ab, const char *s, int len) {
+    char *new = realloc(ab->b, ab->len + len);
+
+    if (new == NULL) {
+        return;
+    }
+    memcpy(&new[ab->len], s, len);
+    ab->b = new;
+    ab->len += len;
+}
+
+void abFree(struct abuf *ab) {
+    free(ab->b);
+}
+
 /*** Output: ***/
 void editorDrawRows(struct abuf *ab) {
     int y;
+
     for (y = 0; y < E.screenrows; y++) {
         if (y == E.screenrows / 3) {
             char welcome[80];
             int welcomelen = snprintf(
-                                      welcome,
-                                      sizeof(welcome),
-                                      "OZ editor -- version %s",
-                                      OZ_VERSION
-                                      );
+                welcome,
+                sizeof(welcome),
+                "OZ editor -- version %s",
+                OZ_VERSION
+            );
             if (welcomelen > E.screencols) {
                 welcomelen = E.screencols;
             }
@@ -170,13 +164,11 @@ void editorDrawRows(struct abuf *ab) {
         } else {
             abAppend(ab, "~", 1);
         }
+        abAppend(ab, "\x1b[K", 3);
+        if (y < E.screenrows - 1) {
+            abAppend(ab, "\r\n", 2);
+        }
     }
-
-    abAppend(ab, "\x1b[K", 3);
-    if (y < E.screenrows - 1) {
-        abAppend(ab, "\r\n", 2);
-    }
-
 }
 
 void editorRefreshScreen() {
@@ -200,11 +192,11 @@ void editorRefreshScreen() {
 /*** Input: ***/
 void editorProcessKeypress() {
     char c = editorReadKey();
-    struct abuf ab = ABUF_INIT;
 
     switch (c) {
     case CTRL_KEY('q'):
-        clearScreen(&ab);
+        write(STDOUT_FILENO, "\x1b[2J", 4);
+        write(STDOUT_FILENO, "\x1b[H", 3);
         exit(0);
         break;
     }
@@ -225,7 +217,6 @@ int main() {
     initEditor();
 
     while (1) {
-
         editorRefreshScreen();
         editorProcessKeypress();
     }
