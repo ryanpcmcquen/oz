@@ -11,17 +11,17 @@
 /*** Defines: ***/
 #define OZ_VERSION "0.0.1"
 
-#define CTRL_KEY(k) ((k) & 0x1f)
+#define CTRL_KEY(k) ((k)&0x1f)
 
 enum editorKey {
-                ARROW_LEFT = 1000,
-                ARROW_RIGHT,
-                ARROW_UP,
-                ARROW_DOWN,
-                HOME_KEY,
-                END_KEY,
-                PAGE_UP,
-                PAGE_DOWN
+    ARROW_LEFT = 1000,
+    ARROW_RIGHT,
+    ARROW_UP,
+    ARROW_DOWN,
+    HOME_KEY,
+    END_KEY,
+    PAGE_UP,
+    PAGE_DOWN
 };
 /*** Data: ***/
 struct editorConfig {
@@ -34,7 +34,8 @@ struct editorConfig {
 struct editorConfig E;
 
 /*** Terminal: ***/
-void die(const char *s) {
+void die(const char* s)
+{
     write(STDOUT_FILENO, "\x1b[2J", 4);
     write(STDOUT_FILENO, "\x1b[H", 3);
 
@@ -42,13 +43,15 @@ void die(const char *s) {
     exit(1);
 }
 
-void disableRawMode() {
+void disableRawMode()
+{
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1) {
         die("tcsetattr");
     }
 }
 
-void enableRawMode() {
+void enableRawMode()
+{
     if (tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) {
         die("tcgetattr");
     }
@@ -68,7 +71,8 @@ void enableRawMode() {
     }
 }
 
-int editorReadKey() {
+int editorReadKey()
+{
     int nread;
     char c;
     while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
@@ -87,7 +91,7 @@ int editorReadKey() {
 
         if (seq[0] == '[') {
             if (seq[1] >= '0' && seq[1] <= '9') {
-                if (read(STDIN_FILENO,  &seq[2], 1) != 1) {
+                if (read(STDIN_FILENO, &seq[2], 1) != 1) {
                     return '\x1b';
                 }
                 if (seq[2] == '~') {
@@ -130,14 +134,15 @@ int editorReadKey() {
                 return END_KEY;
             }
         }
-        
+
         return '\x1b';
     } else {
         return c;
     }
 }
 
-int getCursorPosition(int *rows, int *cols) {
+int getCursorPosition(int* rows, int* cols)
+{
     char buf[32];
     unsigned int i = 0;
 
@@ -166,7 +171,8 @@ int getCursorPosition(int *rows, int *cols) {
     return 0;
 }
 
-int getWindowSize(int *rows, int *cols) {
+int getWindowSize(int* rows, int* cols)
+{
     struct winsize ws;
 
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
@@ -183,14 +189,18 @@ int getWindowSize(int *rows, int *cols) {
 
 /*** Append buffer: ***/
 struct abuf {
-    char *b;
+    char* b;
     int len;
 };
 
-#define ABUF_INIT {NULL, 0}
+#define ABUF_INIT \
+    {             \
+        NULL, 0   \
+    }
 
-void abAppend(struct abuf *ab, const char *s, int len) {
-    char *new = realloc(ab->b, ab->len + len);
+void abAppend(struct abuf* ab, const char* s, int len)
+{
+    char* new = realloc(ab->b, ab->len + len);
 
     if (new == NULL) {
         return;
@@ -200,23 +210,18 @@ void abAppend(struct abuf *ab, const char *s, int len) {
     ab->len += len;
 }
 
-void abFree(struct abuf *ab) {
-    free(ab->b);
-}
+void abFree(struct abuf* ab) { free(ab->b); }
 
 /*** Output: ***/
-void editorDrawRows(struct abuf *ab) {
+void editorDrawRows(struct abuf* ab)
+{
     int y;
 
     for (y = 0; y < E.screenrows; y++) {
         if (y == E.screenrows / 3) {
             char welcome[80];
-            int welcomelen = snprintf(
-                                      welcome,
-                                      sizeof(welcome),
-                                      "OZ editor -- version %s",
-                                      OZ_VERSION
-                                      );
+            int welcomelen = snprintf(welcome, sizeof(welcome),
+                "OZ editor -- version %s", OZ_VERSION);
             if (welcomelen > E.screencols) {
                 welcomelen = E.screencols;
             }
@@ -239,7 +244,8 @@ void editorDrawRows(struct abuf *ab) {
     }
 }
 
-void editorRefreshScreen() {
+void editorRefreshScreen()
+{
     struct abuf ab = ABUF_INIT;
 
     abAppend(&ab, "\x1b[?25l", 6);
@@ -258,10 +264,11 @@ void editorRefreshScreen() {
 }
 
 /*** Input: ***/
-void editorMoveCursor(int key) {
+void editorMoveCursor(int key)
+{
     switch (key) {
     case ARROW_LEFT:
-        if (E.cx != 0)  {
+        if (E.cx != 0) {
             E.cx--;
         }
         break;
@@ -283,7 +290,8 @@ void editorMoveCursor(int key) {
     }
 }
 
-void editorProcessKeypress() {
+void editorProcessKeypress()
+{
     int c = editorReadKey();
 
     switch (c) {
@@ -302,14 +310,12 @@ void editorProcessKeypress() {
         break;
 
     case PAGE_UP:
-    case PAGE_DOWN:
-        {
-            int times = E.screenrows;
-            while (times--) {
-                editorMoveCursor(c == PAGE_UP ? ARROW_UP : ARROW_DOWN);
-            }
+    case PAGE_DOWN: {
+        int times = E.screenrows;
+        while (times--) {
+            editorMoveCursor(c == PAGE_UP ? ARROW_UP : ARROW_DOWN);
         }
-        break;
+    } break;
     case ARROW_UP:
     case ARROW_DOWN:
     case ARROW_LEFT:
@@ -320,7 +326,8 @@ void editorProcessKeypress() {
 }
 
 /*** Init: ***/
-void initEditor() {
+void initEditor()
+{
     E.cx = 0;
     E.cy = 0;
 
@@ -329,7 +336,8 @@ void initEditor() {
     }
 }
 
-int main() {
+int main()
+{
     enableRawMode();
     initEditor();
 
