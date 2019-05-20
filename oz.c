@@ -1,4 +1,8 @@
 /*** Includes: ***/
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
+#define _GNU_SOURCE
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
@@ -257,7 +261,7 @@ void editorDrawRows(struct abuf* ab)
 
     for (y = 0; y < E.screenrows; y++) {
         if (y >= E.numrows) {
-            if (y == E.screenrows / 3) {
+            if (E.numrows == 0 && y == E.screenrows / 3) {
                 char welcome[80];
                 int welcomelen = snprintf(welcome, sizeof(welcome),
                     "OZ editor -- version %s", OZ_VERSION);
@@ -383,11 +387,13 @@ void initEditor()
     }
 }
 
-int main()
+int main(int argc, char* argv[])
 {
     enableRawMode();
     initEditor();
-    editorOpen();
+    if (argc >= 2) {
+        editorOpen(argv[1]);
+    }
 
     while (1) {
         editorRefreshScreen();
