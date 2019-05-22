@@ -32,7 +32,9 @@ enum editorKey {
 /*** Data: ***/
 typedef struct erow {
     int size;
+    int rsize;
     char* chars;
+    char* render;
 } erow;
 
 struct editorConfig {
@@ -205,6 +207,20 @@ int getWindowSize(int* rows, int* cols)
 }
 
 /*** Row operations: ***/
+void editorUpdateRow(erow* row)
+{
+    free(row->render);
+    row->render = malloc(row->size + 1);
+
+    int j;
+    int idx = 0;
+    for (j = 0; j < row->size; j++) {
+        row->render[idx++] = row->chars[j];
+    }
+    row->render[idx] = '\0';
+    row->rsize = idx;
+}
+
 void editorAppendRow(char* s, size_t len)
 {
     E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1));
@@ -214,6 +230,11 @@ void editorAppendRow(char* s, size_t len)
     E.row[at].chars = malloc(len + 1);
     memcpy(E.row[at].chars, s, len);
     E.row[at].chars[len] = '\0';
+
+    E.row[at].rsize = 0;
+    E.row[at].render = NULL;
+    editorUpdateRow(&E.row[at]);
+
     E.numrows++;
 }
 
