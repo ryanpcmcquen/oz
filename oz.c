@@ -64,7 +64,7 @@ struct editorConfig E;
 /*** Prototypes: ***/
 void editorSetStatusMessage(const char* fmt, ...);
 void editorRefreshScreen();
-char* editorPrompt(char* prompt);
+char* editorPrompt(char* prompt, void (*callback)(char*, int));
 
 /*** Terminal: ***/
 void die(const char* s)
@@ -458,7 +458,7 @@ void editorOpen(char* filename)
 void editorSave()
 {
     if (E.filename == NULL) {
-        E.filename = editorPrompt("Save as: %s");
+        E.filename = editorPrompt("Save as: %s (ESC to cancel)", NULL);
         if (E.filename == NULL) {
             editorSetStatusMessage("Save aborted.");
             return;
@@ -487,11 +487,22 @@ void editorSave()
 }
 
 /*** Find: ***/
-void editorFind()
+void editorFindCallback(char* query, int key)
 {
-    char* query = editorPrompt("Search: %s (ESC to cancel)");
-    if (query == NULL) {
+    static int last_match = -1;
+    static int direction = 1;
+
+    if (key == '\r' || key == '\x1b') {
+        last_match = -1;
+        direction = 1;
         return;
+    } else if (key == ARROW_RIGHT || key == ARROW_DOWN) {
+        direction = 1;
+    } else if (key == ARROW_LEFT || key == ARROW_UP) {
+        direction = -1;
+    } else {
+        last_match = -1;
+        direction = 1;
     }
 
     int i;
@@ -506,8 +517,25 @@ void editorFind()
             break;
         }
     }
+}
 
-    free(query);
+void editorFind()
+{
+    int saved_cx = E.cx;
+    int saved_cy = E.cy;
+    int saved_coloff = E.coloff;
+    int saved_rowoff = E.rowoff;
+
+    char* query = editorPrompt("Search: %s (ESC to cancel)", editorFindCallback);
+
+    if (query) {
+        free(query);
+    } else {
+        E.cx = saved_cx;
+        E.cy = saved_cy;
+        E.coloff = saved_coloff;
+        E.rowoff = saved_rowoff;
+    }
 }
 
 /*** Append buffer: ***/
@@ -688,7 +716,7 @@ void editorSetStatusMessage(const char* fmt, ...)
 }
 
 /*** Input: ***/
-char* editorPrompt(char* prompt)
+char* editorPrompt(char* prompt, void (*callback)(char*, int))
 {
     size_t bufsize = 128;
     char* buf = malloc(bufsize);
@@ -707,11 +735,17 @@ char* editorPrompt(char* prompt)
             }
         } else if (c == '\x1b') {
             editorSetStatusMessage("");
+            if (callback) {
+                callback(buf, c);
+            }
             free(buf);
             return NULL;
         } else if (c == '\r') {
             if (buflen != 0) {
                 editorSetStatusMessage("");
+                if (callback) {
+                    callback(buf, c);
+                }
                 return buf;
             }
         } else if (!iscntrl(c) && c < 128) {
@@ -721,6 +755,10 @@ char* editorPrompt(char* prompt)
             }
             buf[buflen++] = c;
             buf[buflen] = '\0';
+        }
+
+        if (callback) {
+            callback(buf, c);
         }
     }
 }
