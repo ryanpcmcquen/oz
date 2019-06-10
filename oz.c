@@ -17,7 +17,7 @@
 #include <unistd.h>
 
 /*** Defines: ***/
-#define OZ_VERSION "0.0.1"
+#define OZ_VERSION "0.1.1"
 #define OZ_TAB_STOP 8
 #define OZ_QUIT_TIMES 2
 
