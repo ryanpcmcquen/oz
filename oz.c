@@ -17,8 +17,8 @@
 #include <unistd.h>
 
 /*** Defines: ***/
-#define OZ_VERSION "0.1.1"
-#define OZ_TAB_STOP 8
+#define OZ_VERSION "0.1.2"
+#define OZ_TAB_STOP 4
 #define OZ_QUIT_TIMES 2
 
 #define CTRL_KEY(k) ((k)&0x1f)
@@ -73,7 +73,7 @@ void die(const char* s)
     write(STDOUT_FILENO, "\x1b[H", 3);
 
     perror(s);
-    exit(1);
+    exit(EXIT_FAILURE);
 }
 
 void disableRawMode()
@@ -837,7 +837,7 @@ void editorProcessKeypress()
         }
         write(STDOUT_FILENO, "\x1b[2J", 4);
         write(STDOUT_FILENO, "\x1b[H", 3);
-        exit(0);
+        exit(EXIT_SUCCESS);
         break;
 
     case CTRL_KEY('s'):
@@ -926,6 +926,7 @@ int main(int argc, char* argv[])
 {
     enableRawMode();
     initEditor();
+
     if (argc >= 2) {
         editorOpen(argv[1]);
     }
