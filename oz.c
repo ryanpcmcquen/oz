@@ -17,8 +17,8 @@
 #include <unistd.h>
 
 /*** Defines: ***/
-#define OZ_VERSION "0.1.1"
-#define OZ_TAB_STOP 8
+#define OZ_VERSION "0.1.2"
+// #define OZ_TAB_STOP 8
 #define OZ_QUIT_TIMES 2
 
 #define CTRL_KEY(k) ((k)&0x1f)
@@ -73,7 +73,7 @@ void die(const char* s)
     write(STDOUT_FILENO, "\x1b[H", 3);
 
     perror(s);
-    exit(1);
+    exit(EXIT_FAILURE);
 }
 
 void disableRawMode()
@@ -223,17 +223,17 @@ int getWindowSize(int* rows, int* cols)
 }
 
 /*** Row operations: ***/
-int editorRowCxToRx(erow* row, int cx)
+int editorRowCxToRx(int cx)
 {
-    int rx = 0;
-    int j;
-    for (j = 0; j < cx; j++) {
-        if (row->chars[j] == '\t') {
-            rx += (OZ_TAB_STOP - 1) - (rx % OZ_TAB_STOP);
-        }
-        rx++;
-    }
-    return rx;
+    // int rx = 0;
+    // int j;
+    // for (j = 0; j < cx; j++) {
+    //     // if (row->chars[j] == '\t') {
+    //     //     rx += (OZ_TAB_STOP - 1) - (rx % OZ_TAB_STOP);
+    //     // }
+    //     rx++;
+    // }
+    return cx;
 }
 
 int editorRowRxToCx(erow* row, int rx)
@@ -242,9 +242,9 @@ int editorRowRxToCx(erow* row, int rx)
     int cx;
 
     for (cx = 0; cx < row->size; cx++) {
-        if (row->chars[cx] == '\t') {
-            cur_rx += (OZ_TAB_STOP - 1) - (cur_rx % OZ_TAB_STOP);
-        }
+        // if (row->chars[cx] == '\t') {
+        //     cur_rx += (OZ_TAB_STOP - 1) - (cur_rx % OZ_TAB_STOP);
+        // }
         cur_rx++;
 
         if (cur_rx > rx) {
@@ -256,26 +256,27 @@ int editorRowRxToCx(erow* row, int rx)
 
 void editorUpdateRow(erow* row)
 {
-    int tabs = 0;
+    // int tabs = 0;
     int j;
-    for (j = 0; j < row->size; j++) {
-        if (row->chars[j] == '\t') {
-            tabs++;
-        }
-    }
-    free(row->render);
-    row->render = malloc(row->size + tabs * (OZ_TAB_STOP - 1) + 1);
+    // for (j = 0; j < row->size; j++) {
+    //     if (row->chars[j] == '\t') {
+    //         tabs++;
+    //     }
+    // }
+    // free(row->render);
+    // row->render = malloc(row->size + tabs * (OZ_TAB_STOP - 1) + 1);
+    row->render = malloc(row->size);
 
     int idx = 0;
     for (j = 0; j < row->size; j++) {
-        if (row->chars[j] == '\t') {
-            row->render[idx++] = ' ';
-            while (idx % OZ_TAB_STOP != 0) {
-                row->render[idx++] = ' ';
-            }
-        } else {
-            row->render[idx++] = row->chars[j];
-        }
+        // if (row->chars[j] == '\t') {
+        //     row->render[idx++] = ' ';
+        //     while (idx % OZ_TAB_STOP != 0) {
+        //         row->render[idx++] = ' ';
+        //     }
+        // } else {
+        row->render[idx++] = row->chars[j];
+        // }
     }
     row->render[idx] = '\0';
     row->rsize = idx;
@@ -582,7 +583,8 @@ void editorScroll()
     E.rx = E.cx;
 
     if (E.cy < E.numrows) {
-        E.rx = editorRowCxToRx(&E.row[E.cy], E.cx);
+        // E.rx = editorRowCxToRx(E.cx);
+        E.rx = E.cx;
     }
 
     if (E.cy < E.rowoff) {
@@ -837,7 +839,7 @@ void editorProcessKeypress()
         }
         write(STDOUT_FILENO, "\x1b[2J", 4);
         write(STDOUT_FILENO, "\x1b[H", 3);
-        exit(0);
+        exit(EXIT_SUCCESS);
         break;
 
     case CTRL_KEY('s'):
