@@ -17,11 +17,14 @@
 #include <unistd.h>
 
 /*** Defines: ***/
-#define OZ_VERSION "0.1.2"
+#define OZ_VERSION "0.1.3"
 #define OZ_TAB_STOP 4
 #define OZ_QUIT_TIMES 2
 
 #define CTRL_KEY(k) ((k)&0x1f)
+
+#define EMPTY_LINE_CHAR '?'
+#define EMPTY_LINE_STR "?"
 
 enum editorKey {
     BACKSPACE = 127,
@@ -127,7 +130,7 @@ int editorReadKey()
                 if (read(STDIN_FILENO, &seq[2], 1) != 1) {
                     return '\x1b';
                 }
-                if (seq[2] == '~') {
+                if (seq[2] == EMPTY_LINE_CHAR) {
                     switch (seq[1]) {
                     case '1':
                         return HOME_KEY;
@@ -325,14 +328,9 @@ void editorRowInsertChar(erow* row, int at, int c)
     if (at < 0 || at > row->size) {
         at = row->size;
     }
-    row->chars = realloc(
-        row->chars,
-        row->size + 2);
+    row->chars = realloc(row->chars, row->size + 2);
 
-    memmove(
-        &row->chars[at + 1],
-        &row->chars[at],
-        row->size - at + 1);
+    memmove(&row->chars[at + 1], &row->chars[at], row->size - at + 1);
     row->size++;
     row->chars[at] = c;
     editorUpdateRow(row);
@@ -607,7 +605,9 @@ void editorDrawRows(struct abuf* ab)
         int filerow = y + E.rowoff;
         if (filerow >= E.numrows) {
 
-            if (E.numrows == 0 && y == E.screenrows / 3) {
+            if (y == 0) {
+                // Skip the first line.
+            } else if (E.numrows == 0 && y == E.screenrows / 3) {
                 char welcome[80];
                 int welcomelen = snprintf(welcome, sizeof(welcome),
                     "OZ editor -- version %s", OZ_VERSION);
@@ -616,7 +616,7 @@ void editorDrawRows(struct abuf* ab)
                 }
                 int padding = (E.screencols - welcomelen) / 2;
                 if (padding) {
-                    abAppend(ab, "~", 1);
+                    abAppend(ab, EMPTY_LINE_STR, 1);
                     padding--;
                 }
                 while (padding--) {
@@ -624,7 +624,7 @@ void editorDrawRows(struct abuf* ab)
                 }
                 abAppend(ab, welcome, welcomelen);
             } else {
-                abAppend(ab, "~", 1);
+                abAppend(ab, EMPTY_LINE_STR, 1);
             }
         } else {
             int len = E.row[filerow].rsize - E.coloff;
@@ -647,19 +647,10 @@ void editorDrawStatusBar(struct abuf* ab)
     char status[80];
     char rstatus[80];
 
-    int len = snprintf(
-        status,
-        sizeof(status),
-        "%.20s - %d lines %s",
-        E.filename ? E.filename : "[No name]",
-        E.numrows,
+    int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
+        E.filename ? E.filename : "[No name]", E.numrows,
         E.dirty ? "(modified)" : "");
-    int rlen = snprintf(
-        rstatus,
-        sizeof(rstatus),
-        "%d%d",
-        E.cy + 1,
-        E.numrows);
+    int rlen = snprintf(rstatus, sizeof(rstatus), "%d%d", E.cy + 1, E.numrows);
 
     if (len > E.screencols) {
         len = E.screencols;
@@ -705,7 +696,8 @@ void editorRefreshScreen()
     editorDrawMessageBar(&ab);
 
     char buf[32];
-    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, (E.rx - E.coloff) + 1);
+    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1,
+        (E.rx - E.coloff) + 1);
     abAppend(&ab, buf, strlen(buf));
 
     abAppend(&ab, "\x1b[?25h", 6);
@@ -718,11 +710,7 @@ void editorSetStatusMessage(const char* fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    vsnprintf(
-        E.statusmsg,
-        sizeof(E.statusmsg),
-        fmt,
-        ap);
+    vsnprintf(E.statusmsg, sizeof(E.statusmsg), fmt, ap);
     va_end(ap);
     E.statusmsg_time = time(NULL);
 }
@@ -828,10 +816,9 @@ void editorProcessKeypress()
 
     case CTRL_KEY('q'):
         if (E.dirty && quit_times > 0) {
-            editorSetStatusMessage(
-                "WARNING!!! File has unsaved changes. Press Ctrl-Q %d more time%s to quit.",
-                quit_times,
-                quit_times > 1 ? "s" : "");
+            editorSetStatusMessage("WARNING!!! File has unsaved changes. Press "
+                                   "Ctrl-Q %d more time%s to quit.",
+                quit_times, quit_times > 1 ? "s" : "");
             quit_times--;
             return;
         }
